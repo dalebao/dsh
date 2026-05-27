@@ -66,18 +66,18 @@ An agent must not write a plan and execute it in the same response. Why? Because
 
 The separation forces a **human gate**: proposal → presented → approved/rejected → execution. This extends the timeline by exactly one approval round. The cost is minor. The cost of skipping it is an agent committing to a flawed approach without oversight.
 
-### 4. Every Human Request Is an ExecPlan
+### 4. ExecPlan Creation Is Skill-Gated
 
 The original rule said "write an ExecPlan if the task is ambiguous." This was a mistake — it gave the agent the authority to decide what counts as "ambiguous." The agent always chose "not ambiguous" and skipped the plan.
 
-The corrected rule: **every human request is an ExecPlan.** There are exactly two paths:
+The corrected rule: **ExecPlan creation is triggered by explicit user request only.** There are exactly two paths:
 
 ```
-request → no active EP → create new EP → PENDING → approved → EXECUTE
-request → active EP (approved) in scope → resume EXECUTE
+/plan or "创建 ExecPlan" → execplan-create skill → PLAN → PENDING → approved → EXECUTE
+any other request       → lightweight discussion (no ExecPlan)
 ```
 
-No third path. No "this task is small enough to skip." No judgment call.
+No guessing. No "this task is small enough to skip." The agent does not decide what warrants a plan.
 
 ### 5. Defense in Depth
 
@@ -97,11 +97,11 @@ The hook is the most important — it's the only layer the agent cannot bypass. 
 
 | Pillar | File | Mechanism |
 |--------|------|-----------|
-| State machine | `AGENTS.md` | 17 MUST constraints + state transition table + `[STATE]` header |
-| Checkable constraints | `.harness/constraints.yaml` | 22 invariants + 2 guardrails, each with a `check` field |
+| State machine | `AGENTS.md` | 11 MUST constraints + state transition table + `[STATE]` header |
+| Checkable constraints | `.harness/constraints.yaml` | 10 invariants + 2 guardrails, each with a `check` field |
 | Proposal/execution split | `AGENTS.md` constraint 8 | "A single response MUST NOT contain both a novel proposal and its implementation" |
-| Every request = EP | `AGENTS.md` constraint 5 | Four-branch decision tree (new/resume/pending/out-of-scope) |
-| Defense in depth | `.harness/docs/L4_SKILLS/hooks.md` | Pre-commit hook script + CI workflow template |
+| Every request = EP | `AGENTS.md` constraint 5 | Skill-gated: ExecPlan only on /plan or explicit request |
+| Defense in depth | `.harness/docs/L4_SKILLS/hooks.md` | Pre-commit hook design + validation pipeline |
 
 ---
 
@@ -116,20 +116,22 @@ your-project/
     │
     ├── execplan/
     │   ├── template.md    ← ExecPlan structure + step granularity spec
-    │   └── active/        ← One ExecPlan per active task
+    │   ├── proposal/      ← Drafts awaiting human approval
+    │   ├── active/        ← Approved plans in execution
+    │   └── completed/     ← Finished plans
     │
     ├── docs/
     │   ├── L1_INDEX.md    ← Topic navigation (start here)
     │   ├── L2_MODULES/    ← Module-level docs
-    │   ├── L3_FACTS/      ← Stable facts: build, test, config
-    │   └── L4_SKILLS/     ← Executable skill definitions
+    │   ├── L3_FACTS/      ← Stable facts: build, test, config, metrics design
+    │   └── L4_SKILLS/     ← Reusable skill definitions
     │
     ├── recordings/
     │   ├── decisions/     ← Decision Records (DR-*.md)
     │   └── checkpoints/   ← State snapshots
     │
-    ├── metrics/           ← Project health definitions
-    └── taxonomy.yaml      ← Issue classification
+    └── scripts/
+        └── validate-yaml.sh ← Structural validation for harness config
 ```
 
 ### The Three Architecture Layers
@@ -210,3 +212,23 @@ Projects using dsh get three things that ad-hoc agent workflows cannot provide:
 ---
 
 *Dale's Harness v0.1.0 — Built via self-validation. No runtime required. Everything is readable markdown and YAML.*
+
+---
+
+## Changelog
+
+### 2026-05-27 — v0.1.0
+
+Initial release. Key design decisions and changes from the development session:
+
+- **ExecPlan lifecycle**: Introduced Phase-Annotated template with `proposal/ → active/ → completed/` directory lifecycle. Sections reorganized from ~11 to 6 by Phase (Plan → Review Gate → Execution → Audit → Close).
+- **Trigger model**: Replaced "every request is an ExecPlan" with skill-gated creation (`/plan` or explicit user request only). Agent no longer guesses user intent.
+- **Config cleanup**:
+  - `constraints.yaml`: 28→10 invariants (-64%). Removed unverifiable rules; kept only core workflow constraints.
+  - `config.yaml`: Removed `gc`, `L1_language`, `auto_block_on`/`auto_flag_for_review` — were decoration without implementation.
+  - `taxonomy.yaml`: Removed (no collection mechanism existed).
+  - `metrics/definitions.yaml`: Moved to `.harness/docs/L3_FACTS/metrics-design.md` as design reference.
+  - Added `validate-yaml.sh` verification script, integrated into `verification.layers`.
+- **L4_SKILLS cleanup**: 13→10 files, 780→356 lines. Removed `doc-sync.md` (logic in config.yaml), `goal-check.md` (zero executions), `code-index.md` (design doc for projects with runtime code). Trimmed `checkpoint.md`, `report.md`, `hooks.md`, `verify.md`, `decision-log.md`.
+- **template/AGENTS.md**: Separated from root AGENTS.md. Template version has generic CORE GOAL placeholder and excludes project-specific constraints (#7, #8).
+- **Version**: 0.1.0 — stable baseline. No breaking changes to the ExecPlan template format. All files are forward-compatible. Future versions will add CI integration and multi-project support.

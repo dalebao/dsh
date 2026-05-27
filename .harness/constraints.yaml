@@ -1,0 +1,65 @@
+# Architecture invariants — encoded as machine-checkable rules
+
+invariants:
+  - id: human-gate
+    description: "No execute without approval; proposal/impl in separate turns"
+    scope: universal
+    check: "Human Approval section has approver+timestamp. No mixing proposal+impl in same turn."
+
+  - id: execplan-skill-gated
+    description: "ExecPlan only on explicit /plan or /dsh_exec_plan"
+    scope: universal
+    check: "Before creating ExecPlan, confirm user explicitly requested. Otherwise use light discussion."
+
+  - id: workflow-discipline
+    description: "Response starts with [STATE]; no state jumps"
+    scope: universal
+    check: "First line: [STATE: <state>]. No ANALYZE→COMPLETE or similar jumps."
+
+  - id: session-start-mandatory
+    description: "Session-start skill before entering ANALYZE"
+    scope: process
+    check: "First response: 5 intermediate outputs + [SESSION START] summary"
+
+  - id: step-discipline
+    description: "Each step: atomic, 1 command + 1 outcome + 1 verification, verified before done"
+    scope: universal
+    check: "No step done without verification. Each step has exactly 1 command, 1 outcome, 1 verification."
+
+  - id: checkpoint-discipline
+    description: "Checkpoint per step; file changes only in EXECUTE with approved plan"
+    scope: universal
+    check: "Each Evidence Log step has checkpoint ref. No file changes outside EXECUTE without approved ExecPlan."
+
+  - id: doc-reference-freshness
+    description: "All .harness/docs/ references must resolve"
+    scope: cross-file
+    check: "find .harness/docs/ -name '*.md' -exec grep -oP '\\.harness/[\\w_/.-]+' {} \\; | while read r; do [ -f \"$r\" ] || [ -d \"$r\" ] || exit 1; done"
+
+  - id: discussion-trace
+    description: "ExecPlan: record each substantive analysis turn"
+    scope: universal
+    check: "Discussion Trace table has rows for each turn"
+
+  - id: goal-granularity
+    description: "ExecPlan: separate Task Goal vs Core Goal with relationship"
+    scope: universal
+    check: "Goal Alignment section: Task Goal + Relationship + Core Goal present"
+
+  - id: fix-implementation-not-tests
+    description: "Test/CI failures fix implementation, not tests"
+    scope: universal
+    check: "When test/CI fails, fix implementation. Test changes need spec docs + approval."
+
+guardrails:
+  - id: execplan-completeness
+    description: "Block if ExecPlan acceptance criteria not met"
+    scope: universal
+    type: pre-commit
+    message: "Complete all ExecPlan acceptance criteria before marking done."
+
+  - id: placeholder-check
+    description: "Block if placeholder content remains"
+    scope: universal
+    type: pre-commit
+    message: "Replace placeholder values before commit."

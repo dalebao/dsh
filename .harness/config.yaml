@@ -1,0 +1,49 @@
+# Harness configuration
+name: "harness-engineering"
+version: 0.1.0
+
+# Documentation layers
+docs:
+  root: .harness/docs/
+  layers:
+    L1_INDEX: L1_INDEX.md
+    L2_MODULES: L2_MODULES/
+    L3_FACTS: L3_FACTS/
+    L4_SKILLS: L4_SKILLS/
+
+# Hook configuration
+hooks:
+  pre-commit:
+    L0_general:
+      enabled: true
+      checks:
+        - file_size_limit: "1MB"
+        - merge_conflict_markers
+        - placeholder_content
+    L2_ai_specific:
+      enabled: true
+      checks:
+        - placeholder_check
+        - execplan_completeness
+
+# Verification pipeline — run in order, stop on first failure
+verification:
+  layers:
+    - validate_yaml   # YAML structural integrity
+    - lint_docs       # Doc path resolution
+  scripts:
+    validate_yaml: 'bash .harness/scripts/validate-yaml.sh'
+    lint_docs: 'find .harness/docs/ -name "*.md" -exec grep -oP "\.harness/[\w/._-]+" {} \; | while read ref; do [ -f "$ref" ] || [ -d "$ref" ] || echo "[FAIL] Broken reference: $ref"; done'
+
+# Quality gates — required gates for "done", checked by agent in Acceptance
+quality_gates:
+  required:
+    - all_verification_layers_pass
+    - no_placeholder_content
+    - docs_updated_if_scope_includes_changes
+    - architecture_invariants_satisfied
+    - execplan_acceptance_criteria_met
+    - execplan_evidence_log_complete
+    - task_goal_achieved
+  escalation:
+    max_retry_per_check: 3
